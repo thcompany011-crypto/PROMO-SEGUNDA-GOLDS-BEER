@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Controle de Mesas · Sinuca</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --felt-dark:#0D2B1F;
+    --felt:#14432E;
+    --felt-light:#1C5A3D;
+    --wood:#5C3A21;
+    --wood-light:#8B5E34;
+    --cream:#F2E8CF;
+    --cream-dim:#C9BE9E;
+    --gold:#D4A017;
+    --red:#C0392B;
+    --shadow: 0 8px 24px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    min-height:100vh;
+    background:
+      radial-gradient(ellipse at top, #1a4a30 0%, var(--felt-dark) 55%),
+      repeating-linear-gradient(45deg, rgba(255,255,255,.015) 0 2px, transparent 2px 6px);
+    font-family:'Inter',system-ui,sans-serif;
+    color:var(--cream);
+    padding:28px 18px 60px;
+  }
+  header{
+    text-align:center;
+    margin-bottom:34px;
+    position:relative;
+  }
+  header .eyebrow{
+    font-size:12px;
+    letter-spacing:.28em;
+    text-transform:uppercase;
+    color:var(--gold);
+    font-weight:600;
+  }
+  header h1{
+    font-family:'Bebas Neue',sans-serif;
+    font-size:clamp(38px,7vw,56px);
+    letter-spacing:.04em;
+    margin:6px 0 4px;
+  }
+  header p{
+    color:var(--cream-dim);
+    font-size:14px;
+    margin:0;
+  }
+  #sync-indicator{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    font-size:11px;
+    color:var(--cream-dim);
+    margin-top:12px;
+    padding:5px 12px;
+    border:1px solid var(--wood-light);
+    border-radius:20px;
+  }
+  #sync-indicator .dot{width:7px;height:7px;border-radius:50%;background:#8a8467;}
+  #sync-indicator.online .dot{background:var(--gold);box-shadow:0 0 6px var(--gold);}
+  #sync-indicator.online{color:var(--gold);border-color:var(--gold);}
+
+  #notif-bar{
+    max-width:520px;
+    margin:14px auto 0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+  }
+  #notif-bar button{
+    background:transparent;
+    border:1px solid var(--wood-light);
+    color:var(--cream-dim);
+    padding:7px 14px;
+    border-radius:20px;
+    font-size:12px;
+    font-family:'Inter',sans-serif;
+    cursor:pointer;
+    transition:.2s;
+  }
+  #notif-bar button:hover{border-color:var(--gold);color:var(--gold);}
+  #notif-bar .ok{color:var(--gold);font-size:12px;}
+
+  section.wrap{max-width:1080px;margin:0 auto;}
+
+  /* ---- LAYOUT MAP ---- */
+  .map-title{
+    font-family:'Bebas Neue',sans-serif;
+    letter-spacing:.06em;
+    font-size:20px;
+    color:var(--gold);
+    text-align:center;
+    margin:0 0 16px;
+  }
+  .salao{
+    background:
+      linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.05)),
+      var(--felt);
+    border:10px solid var(--wood);
+    border-radius:18px;
+    box-shadow:var(--shadow), inset 0 0 40px rgba(0,0,0,.4);
+    padding:28px;
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:22px;
+    max-width:640px;
+    margin:0 auto 40px;
+  }
+  .mesa-icon{
+    aspect-ratio:16/10;
+    background:var(--felt-light);
+    border:5px solid var(--wood-light);
+    border-radius:10px;
+    position:relative;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    transition:transform .2s, box-shadow .3s, border-color .3s;
+  }
+  .mesa-icon:hover{transform:translateY(-2px);}
+  .mesa-icon .pocket{
+    position:absolute;
+    width:11px;height:11px;
+    background:#0a1c12;
+    border-radius:50%;
+    box-shadow:inset 0 0 3px #000;
+  }
+  .mesa-icon .pocket.tl{top:-5px;left:-5px;} .mesa-icon .pocket.tr{top:-5px;right:-5px;}
+  .mesa-icon .pocket.bl{bottom:-5px;left:-5px;} .mesa-icon .pocket.br{bottom:-5px;right:-5px;}
+  .mesa-icon .pocket.tm{top:-5px;left:calc(50% - 5.5px);} .mesa-icon .pocket.bm{bottom:-5px;left:calc(50% - 5.5px);}
+  .mesa-icon .label{
+    font-family:'Bebas Neue',sans-serif;
+    font-size:26px;
+    letter-spacing:.05em;
+    color:var(--cream-dim);
+  }
+  .mesa-icon .dot{
+    position:absolute;
+    bottom:8px;right:10px;
+    width:9px;height:9px;
+    border-radius:50%;
+    background:#5a6b5f;
+  }
+  .mesa-icon.livre{border-color:var(--wood-light);}
+  .mesa-icon.em-jogo{
+    border-color:var(--gold);
+    box-shadow:0 0 0 3px rgba(212,160,23,.18), 0 0 22px rgba(212,160,23,.35);
+  }
+  .mesa-icon.em-jogo .dot{background:var(--gold);}
+  .mesa-icon.em-jogo .label{color:var(--cream);}
+  .mesa-icon.esgotado{
+    border-color:var(--red);
+    animation:pulseRed 1s infinite;
+  }
+  .mesa-icon.esgotado .dot{background:var(--red);}
+  .mesa-icon.esgotado .label{color:var(--cream);}
+  @keyframes pulseRed{
+    0%,100%{box-shadow:0 0 0 3px rgba(192,57,43,.25), 0 0 10px rgba(192,57,43,.3);}
+    50%{box-shadow:0 0 0 8px rgba(192,57,43,.05), 0 0 30px rgba(192,57,43,.6);}
+  }
+
+  /* ---- CONTROL CARDS ---- */
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+    gap:20px;
+  }
+  .card{
+    background:var(--felt);
+    border:1px solid var(--wood);
+    border-radius:16px;
+    padding:20px;
+    box-shadow:var(--shadow);
+    text-align:center;
+    transition:box-shadow .3s, border-color .3s;
+    scroll-margin-top:20px;
+  }
+  .card.em-jogo{border-color:var(--gold);}
+  .card.esgotado{border-color:var(--red);animation:pulseRed 1s infinite;}
+  .card h2{
+    font-family:'Bebas Neue',sans-serif;
+    font-size:22px;
+    letter-spacing:.05em;
+    margin:0 0 2px;
+    color:var(--cream-dim);
+  }
+  .card .status{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.14em;
+    font-weight:600;
+    margin-bottom:14px;
+    color:var(--cream-dim);
+  }
+  .card.em-jogo .status{color:var(--gold);}
+  .card.esgotado .status{color:var(--red);}
+  .timer{
+    font-family:'Bebas Neue',sans-serif;
+    font-size:52px;
+    letter-spacing:.04em;
+    line-height:1;
+    margin:6px 0 4px;
+    font-variant-numeric:tabular-nums;
+  }
+  .card.esgotado .timer{color:var(--red);}
+  .bar-track{
+    height:5px;
+    border-radius:3px;
+    background:rgba(255,255,255,.08);
+    overflow:hidden;
+    margin:10px 0 16px;
+  }
+  .bar-fill{
+    height:100%;
+    background:var(--gold);
+    width:100%;
+    transition:width 1s linear;
+  }
+  .card.esgotado .bar-fill{background:var(--red);}
+  .btn-row{display:flex;gap:8px;}
+  button.action{
+    flex:1;
+    padding:10px 8px;
+    border-radius:9px;
+    border:none;
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    font-size:13px;
+    cursor:pointer;
+    transition:.15s;
+  }
+  button.start{background:var(--gold);color:#241a03;}
+  button.start:hover{filter:brightness(1.08);}
+  button.start:disabled{background:#4a4530;color:#8a8467;cursor:not-allowed;}
+  button.reset{background:transparent;border:1px solid var(--wood-light);color:var(--cream-dim);}
+  button.reset:hover{border-color:var(--red);color:var(--red);}
+  .started-at{
+    font-size:11px;
+    color:var(--cream-dim);
+    opacity:.7;
+    margin-top:10px;
+  }
+  footer{
+    text-align:center;
+    color:var(--cream-dim);
+    opacity:.5;
+    font-size:11px;
+    margin-top:50px;
+  }
+  @media (max-width:480px){
+    .salao{grid-template-columns:1fr 1fr;padding:18px;gap:14px;}
+    .timer{font-size:44px;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">Distribuidora</div>
+  <h1>Controle de Mesas</h1>
+  <p>4 mesas · sessão fixa de 1 hora cada</p>
+  <div><span id="sync-indicator"><span class="dot"></span><span id="sync-text">Modo local (só este aparelho)</span></span></div>
+  <div id="notif-bar">
+    <button id="notif-btn" onclick="ativarNotificacoes()">🔔 Ativar avisos de fim de hora</button>
+    <span class="ok" id="notif-ok" style="display:none;">Avisos ativados ✓</span>
+  </div>
+</header>
+
+<section class="wrap">
+  <p class="map-title">Mapa do Salão</p>
+  <div class="salao" id="mapa"></div>
+
+  <div class="grid" id="cards"></div>
+</section>
+
+<footer>Clique em ▶ Iniciar para começar a hora da mesa. Zerar interrompe a qualquer momento.</footer>
+
+<!-- Firebase (opcional — só ativa a sincronização entre dispositivos se as chaves abaixo forem preenchidas) -->
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
+
+<script>
+// ============================================================
+// CONFIGURAÇÃO FIREBASE — preencha com as chaves do SEU projeto
+// (veja o README.md para o passo a passo de como conseguir isso
+//  gratuitamente no console do Firebase). Deixe como está para
+// rodar em modo local (funciona, mas só num aparelho por vez).
+// ============================================================
+const firebaseConfig = {
+  apiKey: "AIzaSyBwDDMCukZiofcV99Hfq8uPP8K1oh0kikM",
+  authDomain: "controle-sinuca.firebaseapp.com",
+  databaseURL: "https://controle-sinuca-default-rtdb.firebaseio.com",
+  projectId: "controle-sinuca",
+  storageBucket: "controle-sinuca.firebasestorage.app",
+  messagingSenderId: "333107282648",
+  appId: "1:333107282648:web:ccf37a7c70238423e1cdad",
+};
+
+const DURACAO = 60 * 60 * 1000; // 1 hora em ms
+const STORAGE_KEY = 'sinuca_mesas_v1';
+const MESAS = [1,2,3,4];
+
+const modoFirebase = !!(firebaseConfig.apiKey && firebaseConfig.databaseURL);
+let db = null;
+let state = {};
+let notifPermitida = (typeof Notification !== 'undefined' && Notification.permission === 'granted');
+let ultimoStatus = {}; // para detectar transição pra "esgotado" e não repetir alarme
+
+function estadoPadrao(){
+  const init = {};
+  MESAS.forEach(id => init[id] = { endTime:null, running:false, esgotado:false, startedAt:null });
+  return init;
+}
+
+// ---- persistência local (fallback, 1 aparelho) ----
+function carregarEstadoLocal(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw) return JSON.parse(raw);
+  }catch(e){}
+  return estadoPadrao();
+}
+function salvarEstadoLocal(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+// ---- inicialização ----
+if(modoFirebase){
+  firebase.initializeApp(firebaseConfig);
+  db = firebase.database();
+  const ref = db.ref('mesas');
+
+  ref.once('value', snap => {
+    if(!snap.exists()) ref.set(estadoPadrao());
+  });
+
+  ref.on('value', snap => {
+    const val = snap.val();
+    state = val || estadoPadrao();
+    MESAS.forEach(id => { if(!state[id]) state[id] = { endTime:null, running:false, esgotado:false, startedAt:null }; });
+    checarTransicoes();
+    render();
+  });
+
+  document.getElementById('sync-indicator').classList.add('online');
+  document.getElementById('sync-text').textContent = 'Sincronizado entre dispositivos';
+} else {
+  state = carregarEstadoLocal();
+}
+
+function salvarMesa(id, dados){
+  if(modoFirebase){
+    db.ref('mesas/'+id).set(dados);
+  } else {
+    state[id] = dados;
+    salvarEstadoLocal();
+    render();
+  }
+}
+
+function formatarTempo(ms){
+  if(ms < 0) ms = 0;
+  const totalSeg = Math.floor(ms/1000);
+  const m = Math.floor(totalSeg/60).toString().padStart(2,'0');
+  const s = (totalSeg%60).toString().padStart(2,'0');
+  return m+':'+s;
+}
+
+function iniciar(id){
+  const now = Date.now();
+  salvarMesa(id, { endTime: now + DURACAO, running:true, esgotado:false, startedAt: now });
+}
+
+function zerar(id){
+  ultimoStatus[id] = 'livre';
+  salvarMesa(id, { endTime:null, running:false, esgotado:false, startedAt:null });
+}
+
+function statusDe(mesa){
+  if(mesa.esgotado) return 'esgotado';
+  if(mesa.running) return 'em-jogo';
+  return 'livre';
+}
+
+function ativarNotificacoes(){
+  if(typeof Notification === 'undefined'){
+    alert('Este navegador não suporta notificações. O aviso sonoro e visual continuam funcionando normalmente.');
+    return;
+  }
+  Notification.requestPermission().then(p=>{
+    notifPermitida = (p === 'granted');
+    document.getElementById('notif-btn').style.display = notifPermitida ? 'none' : 'inline-block';
+    document.getElementById('notif-ok').style.display = notifPermitida ? 'inline' : 'none';
+  });
+}
+
+let audioCtx = null;
+function tocarAlarme(){
+  try{
+    if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const now = audioCtx.currentTime;
+    for(let i=0;i<3;i++){
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'square';
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.0001, now + i*0.5);
+      gain.gain.exponentialRampToValueAtTime(0.25, now + i*0.5 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + i*0.5 + 0.35);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start(now + i*0.5);
+      osc.stop(now + i*0.5 + 0.4);
+    }
+  }catch(e){}
+}
+
+function notificarFim(id){
+  tocarAlarme();
+  if(notifPermitida){
+    try{
+      new Notification('Mesa ' + id + ' — hora encerrada', {
+        body: 'A hora da Mesa ' + id + ' terminou. Zere quando liberar a mesa.',
+      });
+    }catch(e){}
+  }
+}
+
+// detecta transição de qualquer mesa para "esgotado" (usado nos dois modos)
+function checarTransicoes(){
+  const now = Date.now();
+  MESAS.forEach(id=>{
+    const mesa = state[id];
+    let st = statusDe(mesa);
+
+    // no modo local, quem detecta o fim do tempo é o próprio tick()
+    if(mesa.running && mesa.endTime !== null && (mesa.endTime - now) <= 0 && !mesa.esgotado){
+      mesa.esgotado = true;
+      mesa.running = false;
+      st = 'esgotado';
+      if(modoFirebase){
+        db.ref('mesas/'+id).set(mesa);
+      } else {
+        salvarEstadoLocal();
+      }
+    }
+
+    if(st === 'esgotado' && ultimoStatus[id] !== 'esgotado'){
+      notificarFim(id);
+    }
+    ultimoStatus[id] = st;
+  });
+}
+
+function irParaCard(id){
+  const el = document.getElementById('card-'+id);
+  if(el) el.scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+function pocketsHTML(){
+  return '<span class="pocket tl"></span><span class="pocket tm"></span><span class="pocket tr"></span>'+
+         '<span class="pocket bl"></span><span class="pocket bm"></span><span class="pocket br"></span>';
+}
+
+function render(){
+  const mapa = document.getElementById('mapa');
+  const cards = document.getElementById('cards');
+  mapa.innerHTML = '';
+  cards.innerHTML = '';
+
+  MESAS.forEach(id=>{
+    const mesa = state[id];
+    const st = statusDe(mesa);
+    const restante = mesa.endTime ? Math.max(0, mesa.endTime - Date.now()) : DURACAO;
+    const pct = st === 'livre' ? 100 : Math.max(0, (restante/DURACAO)*100);
+
+    const icon = document.createElement('div');
+    icon.className = 'mesa-icon ' + st;
+    icon.onclick = () => irParaCard(id);
+    icon.innerHTML = pocketsHTML() + '<span class="label">M'+id+'</span><span class="dot"></span>';
+    mapa.appendChild(icon);
+
+    const card = document.createElement('div');
+    card.className = 'card ' + st;
+    card.id = 'card-'+id;
+
+    const statusTxt = st === 'livre' ? 'Livre' : (st === 'em-jogo' ? 'Em jogo' : 'Hora encerrada');
+    const startedTxt = mesa.startedAt ? ('Iniciada às ' + new Date(mesa.startedAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})) : '';
+
+    card.innerHTML = `
+      <h2>Mesa ${id}</h2>
+      <div class="status">${statusTxt}</div>
+      <div class="timer">${formatarTempo(restante)}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+      <div class="btn-row">
+        <button class="action start" ${mesa.running ? 'disabled' : ''} onclick="iniciar(${id})">▶ Iniciar 1h</button>
+        <button class="action reset" onclick="zerar(${id})">↺ Zerar</button>
+      </div>
+      <div class="started-at">${startedTxt}</div>
+    `;
+    cards.appendChild(card);
+  });
+}
+
+if(notifPermitida){
+  document.getElementById('notif-btn').style.display = 'none';
+  document.getElementById('notif-ok').style.display = 'inline';
+}
+
+if(!modoFirebase){
+  Object.keys(state).forEach(id => ultimoStatus[id] = statusDe(state[id]));
+}
+
+render();
+setInterval(()=>{ checarTransicoes(); render(); }, 1000);
+</script>
+</body>
+</html>
