@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Controle de Mesas · Sinuca</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0D2B1F">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Sinuca">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -273,6 +281,7 @@
   <div id="notif-bar">
     <button id="notif-btn" onclick="ativarNotificacoes()">🔔 Ativar avisos de fim de hora</button>
     <span class="ok" id="notif-ok" style="display:none;">Avisos ativados ✓</span>
+    <button id="wake-btn" onclick="alternarTelaLigada()">📱 Manter tela ligada</button>
   </div>
 </header>
 
@@ -383,6 +392,7 @@ function iniciar(id){
 
 function zerar(id){
   ultimoStatus[id] = 'livre';
+  pararAlarme(id);
   salvarMesa(id, { endTime:null, running:false, esgotado:false, startedAt:null });
 }
 
@@ -405,34 +415,88 @@ function ativarNotificacoes(){
 }
 
 let audioCtx = null;
-function tocarAlarme(){
+const alarmesAtivos = {}; // id -> intervalId do loop de som
+
+function tocarBipes(){
   try{
     if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state === 'suspended') audioCtx.resume();
     const now = audioCtx.currentTime;
     for(let i=0;i<3;i++){
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
       osc.type = 'square';
       osc.frequency.value = 880;
-      gain.gain.setValueAtTime(0.0001, now + i*0.5);
-      gain.gain.exponentialRampToValueAtTime(0.25, now + i*0.5 + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + i*0.5 + 0.35);
+      gain.gain.setValueAtTime(0.0001, now + i*0.35);
+      gain.gain.exponentialRampToValueAtTime(0.3, now + i*0.35 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + i*0.35 + 0.28);
       osc.connect(gain).connect(audioCtx.destination);
-      osc.start(now + i*0.5);
-      osc.stop(now + i*0.5 + 0.4);
+      osc.start(now + i*0.35);
+      osc.stop(now + i*0.35 + 0.3);
     }
   }catch(e){}
+  if(navigator.vibrate) navigator.vibrate([200,100,200,100,200]);
+}
+
+function iniciarAlarme(id){
+  if(alarmesAtivos[id]) return; // já tocando
+  tocarBipes();
+  alarmesAtivos[id] = setInterval(tocarBipes, 2200); // repete até alguém confirmar
+}
+
+function pararAlarme(id){
+  if(alarmesAtivos[id]){
+    clearInterval(alarmesAtivos[id]);
+    delete alarmesAtivos[id];
+  }
 }
 
 function notificarFim(id){
-  tocarAlarme();
-  if(notifPermitida){
-    try{
-      new Notification('Mesa ' + id + ' — hora encerrada', {
-        body: 'A hora da Mesa ' + id + ' terminou. Zere quando liberar a mesa.',
+  iniciarAlarme(id);
+  if(notifPermitida && 'serviceWorker' in navigator){
+    navigator.serviceWorker.ready.then(reg=>{
+      reg.showNotification('Mesa ' + id + ' — hora encerrada', {
+        body: 'A hora da Mesa ' + id + ' terminou. Toque para abrir e zerar.',
+        icon: 'icon-192.png',
+        badge: 'icon-192.png',
+        vibrate: [200,100,200,100,200],
+        tag: 'mesa-'+id,
+        requireInteraction: true,
       });
-    }catch(e){}
+    }).catch(()=>{});
+  } else if(notifPermitida){
+    try{ new Notification('Mesa ' + id + ' — hora encerrada'); }catch(e){}
   }
+}
+
+// ---- manter tela ligada (Wake Lock) ----
+let wakeLock = null;
+async function alternarTelaLigada(){
+  const btn = document.getElementById('wake-btn');
+  try{
+    if(!wakeLock){
+      wakeLock = await navigator.wakeLock.request('screen');
+      btn.textContent = '📱 Tela travada ligada ✓';
+      wakeLock.addEventListener('release', ()=>{ wakeLock = null; btn.textContent = '📱 Manter tela ligada'; });
+    } else {
+      await wakeLock.release();
+      wakeLock = null;
+      btn.textContent = '📱 Manter tela ligada';
+    }
+  }catch(e){
+    alert('Este navegador não suporta manter a tela ligada automaticamente. Ajuste o tempo de bloqueio da tela nas configurações do celular.');
+  }
+}
+document.addEventListener('visibilitychange', async ()=>{
+  if(document.visibilityState === 'visible' && wakeLock === null && document.getElementById('wake-btn').textContent.includes('✓')){
+    try{ wakeLock = await navigator.wakeLock.request('screen'); }catch(e){}
+  }
+});
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('service-worker.js').catch(()=>{});
+  });
 }
 
 // detecta transição de qualquer mesa para "esgotado" (usado nos dois modos)
@@ -502,7 +566,10 @@ function render(){
       <div class="timer">${formatarTempo(restante)}</div>
       <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
       <div class="btn-row">
-        <button class="action start" ${mesa.running ? 'disabled' : ''} onclick="iniciar(${id})">▶ Iniciar 1h</button>
+        ${st === 'esgotado'
+          ? `<button class="action reset" onclick="pararAlarme(${id})">🔕 Parar alarme</button>`
+          : `<button class="action start" ${mesa.running ? 'disabled' : ''} onclick="iniciar(${id})">▶ Iniciar 1h</button>`
+        }
         <button class="action reset" onclick="zerar(${id})">↺ Zerar</button>
       </div>
       <div class="started-at">${startedTxt}</div>
