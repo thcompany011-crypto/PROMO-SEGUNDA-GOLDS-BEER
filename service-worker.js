@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sinuca-v1';
+const CACHE_NAME = 'sinuca-v2';
 const ARQUIVOS = [
   './',
   './index.html',
