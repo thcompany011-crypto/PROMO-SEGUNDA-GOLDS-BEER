@@ -44,7 +44,7 @@
     position:relative;
   }
   header .eyebrow{
-    font-size:30px;
+    font-size:12px;
     letter-spacing:.28em;
     text-transform:uppercase;
     color:var(--gold);
@@ -274,7 +274,7 @@
 <body>
 
 <header>
-  <div class="eyebrow">GOLDS BEER</div>
+  <div class="eyebrow">Distribuidora</div>
   <h1>Controle de Mesas</h1>
   <p>4 mesas · sessão fixa de 1 hora cada</p>
   <div><span id="sync-indicator"><span class="dot"></span><span id="sync-text">Modo local (só este aparelho)</span></span></div>
@@ -321,7 +321,7 @@ const MESAS = [1,2,3,4];
 
 const modoFirebase = !!(firebaseConfig.apiKey && firebaseConfig.databaseURL);
 let db = null;
-let state = {};
+let state = estadoPadrao();
 let notifPermitida = (typeof Notification !== 'undefined' && Notification.permission === 'granted');
 let ultimoStatus = {}; // para detectar transição pra "esgotado" e não repetir alarme
 
@@ -587,8 +587,13 @@ if(!modoFirebase){
   Object.keys(state).forEach(id => ultimoStatus[id] = statusDe(state[id]));
 }
 
-render();
-setInterval(()=>{ checarTransicoes(); render(); }, 1000);
+// registra o "tique" do relógio primeiro — assim ele nunca deixa de rodar,
+// mesmo que a primeira renderização abaixo encontre algum problema
+setInterval(()=>{
+  try{ checarTransicoes(); render(); }catch(e){ console.error('Erro ao atualizar:', e); }
+}, 1000);
+
+try{ render(); }catch(e){ console.error('Erro na renderização inicial:', e); }
 </script>
 </body>
 </html>
